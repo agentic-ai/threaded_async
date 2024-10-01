@@ -155,7 +155,8 @@ class Server:
     with timers.TimeoutTimer(
         # pylint: disable=protected-access
         timeout=self._runner._get_timeout_or_default(timeout)) as timer:
-      task = self._runner.create_task(awaitable, timeout=timer.remaining)
+      task = self._runner.create_task(
+        awaitable, task_creation_timeout=timer.remaining)
       # Wait for the event loop to be caught up, to ensure that any requests
       # issued by the task have been pushed onto the queue.
       self._wait_on_eventloop(timeout=timer.remaining)

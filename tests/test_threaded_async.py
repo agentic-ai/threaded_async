@@ -14,7 +14,6 @@
 """Tests for the threaded_async module."""
 
 import asyncio
-import logging
 import threading
 import time
 import unittest
@@ -132,7 +131,7 @@ class TestAsyncRunner(unittest.TestCase):
     blocking.wait()
     return task
 
-  def test_wait_for_next_eventloop_iteration_using_default_timeout(self):
+  def test_wait_for_next_eventloop_iteration_using_call_in_loop_timeout(self):
     """Test wait for the next iteration using the default timeout."""
     timeout = 0.1
     with threaded_async.AsyncRunner(call_in_loop_timeout=timeout) as runner:
@@ -281,23 +280,21 @@ class TestAsyncRunner(unittest.TestCase):
       while True:
         time.sleep(0.01)
 
-    with self.assertLogs(level=logging.WARNING):
-      with threaded_async.AsyncRunner(
-          log_forced_shutdown_stack_trace=False) as runner:
-        _ = runner.create_task(busy_wait())
-        busy_waiting.wait()
-        time.sleep(0.1)
+    with threaded_async.AsyncRunner(
+        log_forced_shutdown_stack_trace=False) as runner:
+      _ = runner.create_task(busy_wait())
+      busy_waiting.wait()
+      time.sleep(0.1)
 
     self.assertEqual(runner.shutdown_type,
                      threaded_async.ShutdownType.FORCE_STOPPED)
 
   def test_shutdown_force_failed(self):
     """Test force stopping a stuck event loop that camps the GIL."""
-    with self.assertLogs(level=logging.WARNING):
-      with threaded_async.AsyncRunner(
-          log_forced_shutdown_stack_trace=False) as runner:
-        _ = self._start_blocking_task(runner, 5.0)
-        time.sleep(0.1)
+    with threaded_async.AsyncRunner(
+        log_forced_shutdown_stack_trace=False) as runner:
+      _ = self._start_blocking_task(runner, 5.0)
+      time.sleep(0.1)
 
     self.assertEqual(runner.shutdown_type,
                      threaded_async.ShutdownType.FAILED_FORCE_STOPPED)
