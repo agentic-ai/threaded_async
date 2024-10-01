@@ -1,0 +1,24 @@
+[project]
+name = "threaded_async"
+version = "1.0"
+dependencies = [
+]
+description = "A python library for running async code in background threads."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools.package-data]
+"threaded_async" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
