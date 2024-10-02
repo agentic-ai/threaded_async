@@ -16,6 +16,7 @@
 from threaded_async import timers
 
 import unittest
+import time
 
 
 class TestTimers(unittest.TestCase):
@@ -25,9 +26,12 @@ class TestTimers(unittest.TestCase):
     """Test a timer with timeout."""
     timer = timers.TimeoutTimer(timeout=1.0)
     with timer:
+      time.sleep(0.05)
       r1 = timer.remaining
+      time.sleep(0.05)
       r2 = timer.remaining
-    self.assertTrue(1.0 > r1 > r2)
+    self.assertTrue(1.0 > r1 > r2,
+                    f"Expected 1.0 > r1={r1} > r2={r2}")
 
   def test_timer_with_none_timeout(self):
     """Test a timer with None as timeout."""

@@ -19,7 +19,6 @@ import contextlib
 import ctypes
 import dataclasses
 import enum
-import logging
 import threading
 import traceback
 import warnings
@@ -39,7 +38,6 @@ from threaded_async import timers
 
 R = TypeVar('R')
 
-_logger = logging.getLogger('threaded_async')
 
 def _force_thread_stop(
     thread: threading.Thread, exception: Type[BaseException]):
@@ -207,9 +205,9 @@ class AsyncRunner:
 
     Args:
       exit_timeout: Timeout when waiting for the event loop to exit.
-      call_in_loop_timeout: Default timeout for call_in_loop. Note that if this
-        value is too small it may cause spurious timeouts, e.g., when exiting
-        the context stack.
+      call_in_loop_timeout: Default timeout for synchronous operations that
+        are called on the loop, e.g., task creation. This helps raise
+        exceptions if the event loop becomes blocked.
       debug: Whether to run the event loop in debug mode, which will track
         tracebacks for all tasks.
       log_forced_shutdown_stack_trace: Whether to log forced thread shutdown
@@ -292,17 +290,11 @@ class AsyncRunner:
         # Suppress async warnings on force shutdown.
         exit_stack.enter_context(_suppress_unawaited_warning())
       if self._thread.is_alive():
-        _logger.warning(
-          'Event loop is stuck. Force killing thread %s', self._thread)
-        # Note, if this is stuck in time.sleep call, then the thread will
-        # not raise until execution has resumed.
         self._shutdown_type = ShutdownType.FORCE_STOPPED
         _force_thread_stop(self._thread, ForcedThreadShutdown)
         self._thread.join(timeout=timeout)
       if self._thread.is_alive():
         self._shutdown_type = ShutdownType.FAILED_FORCE_STOPPED
-        _logger.warning('Unable to shut down thread %s within in %s seconds',
-                        self._thread, timeout)
       self._reraise_pending_bg_tasks()
       self._done.set()
       try:
@@ -358,18 +350,20 @@ class AsyncRunner:
   def call_in_loop(
       self,
       fun: Callable[[], R],
-      timeout: Optional[float] = USE_DEFAULT_TIMEOUT,
-      wrapped_callable_like: (
-        Optional[Union[Callable, Awaitable]]) = None) -> R:
+      timeout: Optional[float] = USE_DEFAULT_TIMEOUT) -> R:
     """Runs callable in loop and returns result.
+
+    Note that this does not deploy a coroutine to the loop, but simply
+    executes the function asynchronously. This function is useful for
+    instantiating, e.g., asyncio.Event objects which store their associated
+    loop.
 
     Args:
       fun: The callable to run. To run a function with arguments use
         functools.partial or a lambda expression to bind the argument.
+        Note that this is not meant for deploying coroutines on the loop.
       timeout: An optional timeout in seconds, None to wait indefinitely or
         USE_DEFAULT_TIMEOUT to use call_in_loop_timeout set in the constructor.
-      wrapped_callable_like: If fun is a wrapper around another callable
-        or awaitable, this can be provided to log the underlying method.
 
     Returns:
       The function return value.
@@ -382,23 +376,25 @@ class AsyncRunner:
     if self.in_runner_loop:
       return fun()
     tracker: _ExecutionTracker[R] = (
-      _ExecutionTracker(self._get_timeout_or_default,
-                        wrapped_callable_like or fun))
+      _ExecutionTracker(self._get_timeout_or_default, fun))
     def _wrapper():
       with tracker.track():
         tracker.set_result(fun())
     _ = self._event_loop.call_soon_threadsafe(_wrapper)
     return tracker.wait(timeout=self._get_timeout_or_default(timeout))
 
-  def create_task(self, awaitable: Awaitable[R],
-                  timeout: Optional[float] = USE_DEFAULT_TIMEOUT) -> (
-                    BackgroundTask[R]):
+  def create_task(
+      self, awaitable: Awaitable[R],
+      task_creation_timeout: Optional[float] = USE_DEFAULT_TIMEOUT) -> (
+        BackgroundTask[R]):
     """Create a background task and return it.
 
     Args:
       awaitable: Awaitable to wrap in a task.
-      timeout: An optional timeout in seconds, None to wait indefinitely or
-        USE_DEFAULT_TIMEOUT to use call_in_loop_timeout set in the constructor.
+      task_creation_timeout: An optional timeout in seconds for task creation.
+        Note that this is not a timeout for task completion but for task
+        creation. Set to None to wait indefinitely or USE_DEFAULT_TIMEOUT to use
+        call_in_loop_timeout set in the constructor.
 
     Returns:
       Task.
@@ -409,7 +405,8 @@ class AsyncRunner:
     """
     self._assert_running()
     task = _BackgroundTask.create(
-      awaitable, self, timeout=self._get_timeout_or_default(timeout))
+      awaitable, self, timeout=self._get_timeout_or_default(
+        task_creation_timeout))
     return task
 
   def run(self, awaitable: Awaitable[R],
@@ -430,7 +427,8 @@ class AsyncRunner:
     """
     self._assert_running()
     with timers.TimeoutTimer(timeout=timeout) as deadline:
-      return (self.create_task(awaitable, timeout=deadline.remaining)
+      return (self.create_task(
+        awaitable, task_creation_timeout=deadline.remaining)
               .wait(timeout=deadline.remaining))
 
   def wait_for_next_eventloop_iteration(
@@ -737,8 +735,7 @@ class _BackgroundTask(BackgroundTask[R]):
     bg_task._async_task = runner.call_in_loop(
       # pylint: disable=protected-access
       bg_task._create_task,
-      timeout=timeout,
-      wrapped_callable_like=awaitable)
+      timeout=timeout)
     # pylint: disable=protected-access
     runner._register_task(bg_task)
     return bg_task
