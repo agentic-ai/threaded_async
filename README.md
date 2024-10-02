@@ -4,7 +4,7 @@ A Python library for running async code in background threads.
 Python offers two primary forms of concurrency: threads (`threading`) and
 asynchronous coroutines (`asyncio`). This library provides support for running
 asynchronous coroutines in background threads and includes synchronization
-primitives that simplfiy coordinating between threaded and async code.
+primitives that simplify coordinating between threaded and async code.
 
 Note that in most cases, threading and coroutines are used independently, as
 they serve different purposes and solve different problems. Before using this
