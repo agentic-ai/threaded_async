@@ -1,6 +1,6 @@
 [project]
 name = "threaded_async"
-version = "1.1"
+version = "1.2"
 dependencies = [
 ]
 description = "A python library for running async code in background threads."
