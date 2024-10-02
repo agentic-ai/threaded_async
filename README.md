@@ -1,5 +1,5 @@
 # threaded\_async
-A Python library for running async code in background threads.
+A self-contained Python library for running async code in background threads.
 
 Python offers two primary forms of concurrency: threads (`threading`) and
 asynchronous coroutines (`asyncio`). This library provides support for running
@@ -13,7 +13,7 @@ in your scenario.
 
 ## Quick start
 
-Install the `threaded_async` library using `pip install threaded_async`.
+Install the `threaded_async` library using `pip install threaded-async`.
 
 Event loops can be created on a background thread by instantiating an
 `AsyncRunner` and entering its context. Coroutines can be scheduled on these
@@ -29,7 +29,7 @@ async def foo() -> int:
   return 10
 
 with threaded_async.AsyncRunner() as runner:
-  # Deploy the coroutine as a task on the loop
+  # Deploy the coroutine as a task on the background thread's event loop.
   background_task = runner.create_task(foo())
   # Block the current thread waiting for the task to complete.
   print(background_task.wait())
@@ -143,6 +143,9 @@ pipenv sync --dev
 pipenv shell
 ./presubmit.sh  # Run tests / lint / typecheck
 ```
+
+You can find the github repository
+[here](http://github.com/agentic-ai/threaded_async).
 
 Before submitting a pull request, please ensure `./presubmit.sh` completes
 without errors.
