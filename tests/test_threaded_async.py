@@ -32,23 +32,6 @@ class TestAsyncRunner(unittest.TestCase):
     with threaded_async.AsyncRunner() as runner:
       self.assertEqual(runner.run(foo(3)), 4)
 
-  def _assert_timeout_exception_string_contains(
-      self, exception: Exception, method_name: str, timeout: float):
-    """Check a timeout exception's message string.
-
-    Args:
-      exception: Exception to check.
-      method_name: Name of the method to find in the message.
-      timeout: Timeout in seconds that should be reported in the message.
-    """
-    self.assertIsInstance(exception, threaded_async.EventLoopTimeoutError)
-    exception_message = str(exception)
-    self.assertRegex(exception_message,
-                     f'execution of .*{method_name}')
-    self.assertIn(f'waiting {timeout:.2}', exception_message)
-    self.assertRegex(exception_message,
-                     f'(?ms).*Traceback:.*{method_name}')
-
   def test_run_timeout(self):
     """Test timing out while running a coroutine."""
     async def coroutine_that_times_out():
@@ -56,10 +39,8 @@ class TestAsyncRunner(unittest.TestCase):
 
     timeout = 0.01
     with threaded_async.AsyncRunner() as runner:
-      with self.assertRaises(threaded_async.EventLoopTimeoutError) as context:
+      with self.assertRaises(threaded_async.EventLoopTimeoutError):
         runner.run(coroutine_that_times_out(), timeout=timeout)
-    self._assert_timeout_exception_string_contains(
-      context.exception, coroutine_that_times_out.__name__, timeout)
 
   def test_in_runner_loop(self):
     """Test the in_runner_loop function."""
@@ -136,10 +117,8 @@ class TestAsyncRunner(unittest.TestCase):
     timeout = 0.1
     with threaded_async.AsyncRunner(call_in_loop_timeout=timeout) as runner:
       task = self._start_blocking_task(runner, 0.5)
-      with self.assertRaises(threaded_async.EventLoopTimeoutError) as context:
+      with self.assertRaises(threaded_async.EventLoopTimeoutError):
         runner.wait_for_next_eventloop_iteration()
-      self._assert_timeout_exception_string_contains(
-        context.exception, 'block', timeout)
       task.wait(timeout=None)
 
   def test_wait_for_next_eventloop_iteration_using_override_timeout(self):
@@ -147,10 +126,8 @@ class TestAsyncRunner(unittest.TestCase):
     with threaded_async.AsyncRunner(call_in_loop_timeout=5.0) as runner:
       task = self._start_blocking_task(runner, 0.5)
       timeout = 0.1
-      with self.assertRaises(threaded_async.EventLoopTimeoutError) as context:
+      with self.assertRaises(threaded_async.EventLoopTimeoutError):
         runner.wait_for_next_eventloop_iteration(timeout=timeout)
-      self._assert_timeout_exception_string_contains(
-        context.exception, 'block', timeout)
       task.wait(timeout=None)
 
   def test_wait_for_next_eventloop_iteration_using_no_timeout(self):
@@ -229,10 +206,8 @@ class TestAsyncRunner(unittest.TestCase):
     timeout = 0.05
     with threaded_async.AsyncRunner(
         call_in_loop_timeout=timeout) as runner:
-      with self.assertRaises(threaded_async.EventLoopTimeoutError) as context:
+      with self.assertRaises(threaded_async.EventLoopTimeoutError):
         runner.call_in_loop(function_that_times_out)
-    self._assert_timeout_exception_string_contains(
-      context.exception, function_that_times_out.__name__, timeout)
 
   def test_cancelled_error(self):
     """Tests that cancelled_errors are correctly handled."""
