@@ -82,7 +82,6 @@ class EventLoopTimeoutError(TimeoutError):
     """
     if isinstance(callable_like, asyncio.Task):
       callable_description = callable_like.get_name()
-      callable_description, stack = callable_description.split('\n', maxsplit=1)
     else:
       callable_description = str(callable_like)
 
@@ -719,11 +718,6 @@ class _BackgroundTask(BackgroundTask[R]):
       # pylint: disable=protected-access
       self._runner._get_timeout_or_default, awaitable)
 
-  @property
-  def _stack(self) -> str:
-    """Stack that was used to create this object."""
-    return self._exec_tracker.stack
-
   @classmethod
   def create(cls,
              awaitable: Awaitable[R],
@@ -744,8 +738,7 @@ class _BackgroundTask(BackgroundTask[R]):
     """Create the task that wraps the awaitable associated with this object."""
     return asyncio.create_task(
       self._run(),
-      name=(f'{self._awaitable}\n'
-            f'{self._stack}'))
+      name=f'{self._awaitable}')
 
   async def _run(self):
     """Await the task result."""
@@ -829,12 +822,6 @@ class _ExecutionTracker(Generic[R]):
     self._exception: Optional[BaseException] = None
     self._get_timeout_or_default = get_timeout_or_default
     self._callable_like = callable_like
-    self._stack = ''.join(traceback.format_list(traceback.extract_stack())[:-1])
-
-  @property
-  def stack(self) -> str:
-    """Stack that was used to create the object being tracked."""
-    return self._stack
 
   def set_result(self, result: R):
     """Set the result."""
@@ -877,8 +864,7 @@ class _ExecutionTracker(Generic[R]):
     """
     wait_timeout = self._get_timeout_or_default(timeout)
     if not self._done.wait(timeout=wait_timeout):
-      raise EventLoopTimeoutError(self._callable_like, wait_timeout,
-                                  stack=self.stack)
+      raise EventLoopTimeoutError(self._callable_like, wait_timeout)
     if self._exception is not None:
       raise self._exception
     if not self._result_set:
